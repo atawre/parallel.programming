@@ -40,14 +40,12 @@ printf("\n");
 	{
 		int id = omp_get_thread_num();
 
-//prefixSum(image, imagePsum, numRepeats, id);
-
 		prefixSumCoarse(image, imagePsum, b, bc, numRepeats, id, nt);
 		//#pragma omp for
 		for(int i=0; i<numRepeats; i++){
 			for(int j=0; j<image[i]; j++){
 				//printf("(%d, %d) ", i,j);
-				//uncompressed[imagePsum[i]+ j] = i&1;
+				uncompressed[imagePsum[i]+ j] = i&1;
 			}
 			//printf("\n");
 		}
@@ -70,7 +68,7 @@ printf("\n");
 		for(int j=0; j<image[i]; j++){
 			int colour = i&1;
 			if(colour != uncompressed[k]){ 
-				//printf("k: %d vs %d\n", k, colour, uncompressed[k]);
+				printf("k: %d vs %d\n", k, colour, uncompressed[k]);
 				passed = 0;
 			}
 			k++;
@@ -103,8 +101,17 @@ printf("\n");
 void prefixSumCoarse(int *a, int *as, int *b, int *bc, int n, int id, int nt){
 	//printf("id: %d ", id);
 	int sum=0;
+    int reminder = n%nt;
 	int chunk = n/nt;
-	int start=id*chunk;
+	//int start=id*chunk;
+    //NUMELEM - (THREADCNT - thid) * numTasks
+	int start = n - (nt-id)*chunk;
+    if(id < n%nt){
+        chunk += 1;
+        start = id*(chunk+1);
+    }
+
+printf("id: %d start: %d chunk: %d\n", id, start, chunk);
 
 	//printf("id=%d => chunk : %d, start : %d\n",id, chunk, start);
 	for(int j=0;j<chunk;j++){
@@ -114,7 +121,11 @@ void prefixSumCoarse(int *a, int *as, int *b, int *bc, int n, int id, int nt){
 	b[id]=as[(id+1)*chunk - 1];
 	#pragma omp barrier
 	prefixSum(b, bc, nt, id);
-
+    if(id>0)
+	    for(int j=0;j<chunk;j++)
+            as[start+j] += b[id-1];
+	for(int j=0;j<chunk;j++)
+        as[start+j] -= a[start+j];
 }
 
 int prefixSum(int *a, int *b, int n, int id){
