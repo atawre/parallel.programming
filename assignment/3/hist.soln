@@ -1,0 +1,46 @@
+void proccess_data_v1(float *data, int *hist, const int n, const int nbins, float max) {
+    #pragma omp parallel 
+    {
+        int *hist_private = new int[nbins];
+        for(int i=0; i<nbins; i++) hist_private[i] = 0;
+        #pragma omp for nowait
+        for(int i=0; i<n; i++) {
+            float x = reconstruct_data(data[i]);
+            fill_hist(hist_private, nbins, max, x);
+        }
+        #pragma omp critical 
+        {
+            for(int i=0; i<nbins; i++) {
+                hist[i] += hist_private[i];
+            }
+        }
+        delete[] hist_private;
+    }
+}
+
+void proccess_data_v2(float *data, int *hist, const int n, const int nbins, float max) {
+    const int nthreads = 8;
+    omp_set_num_threads(nthreads);
+    int *hista = new int[nbins*nthreads];
+
+    #pragma omp parallel 
+    {
+        const int ithread = omp_get_thread_num();
+        for(int i=0; i<nbins; i++) hista[nbins*ithread+i] = 0;
+        #pragma omp for
+        for(int i=0; i<n; i++) {
+            float x = reconstruct_data(data[i]);
+            fill_hist(&hista[nbins*ithread], nbins, max, x);
+        }
+
+        #pragma omp for
+        for(int i=0; i<nbins; i++) {
+            for(int t=0; t<nthreads; t++) {
+                hist[i] += hista[nbins*t + i];
+            }
+        }
+
+    }
+    delete[] hista;
+}
+
